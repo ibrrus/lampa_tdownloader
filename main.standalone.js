@@ -20,7 +20,27 @@
     if (!settings.enabled) return;
     var item = { time: new Date().toISOString(), level: level, event: event, details: details || {} };
     entries.push(item); if (entries.length > MAX) entries.shift(); save();
-    try { (level === 'error' ? console.error : level === 'warn' ? console.warn : console.log)('[TDownloader]', item); } catch (_) {}
+    try {
+      var d = item.details || {};
+      var message = '';
+      var endpoint = d.endpoint || '';
+      var action = /\/auth\/login$/.test(endpoint) ? 'Авторизация'
+        : /\/torrents\/add$/.test(endpoint) ? 'Добавление торрента'
+        : /\/torrents\/(start|resume)$/.test(endpoint) ? 'Запуск торрента'
+        : /\/torrents\/(stop|pause)$/.test(endpoint) ? 'Остановка торрента'
+        : /\/torrents\/delete$/.test(endpoint) ? 'Удаление торрента'
+        : /\/sync\/maindata$/.test(endpoint) ? 'Получение состояния'
+        : endpoint === '/transmission/rpc' ? 'Transmission RPC'
+        : endpoint || 'Запрос';
+      var prefix = d.client ? d.client + ' | ' : '';
+      if (event === 'request') message = '→ #' + d.id + ' ' + prefix + action + ' (' + d.method + ')';
+      else if (event === 'response') message = (d.status >= 200 && d.status < 300 ? '✓' : '✗') + ' #' + d.id + ' ' + prefix + action + ' | HTTP ' + d.status + ' | ' + d.durationMs + ' мс';
+      else if (event === 'request_failed' || event === 'request_exception') message = '✗ #' + d.id + ' ' + prefix + action + ' | ошибка сети / CORS / HTTPS | ' + d.durationMs + ' мс';
+      else if (event === 'diagnostics_initialized') message = 'Диагностика включена (' + d.version + ')';
+      else if (event === 'log_cleared') message = 'Журнал очищен';
+      else message = event + (d.error && d.error.category ? ' | ' + d.error.category : '');
+      (level === 'error' ? console.error : level === 'warn' ? console.warn : console.log)('[TDownloader] ' + message);
+    } catch (_) {}
   }
   function api(input, options) {
     try {
